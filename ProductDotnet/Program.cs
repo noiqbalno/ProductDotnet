@@ -19,6 +19,9 @@ builder.Services.AddDbContext<RepositoryDbContext>(options =>
     options.UseSqlServer(builder.Configuration["ConnectionStrings:DbConnection"]);
 });
 
+builder.Services.AddScoped<IRepositoryBase<Category>, CategoryRepository>();
+builder.Services.AddScoped<ICategoryService<CategoryDto>, CategoryService>();
+
 builder.Services.AddScoped<IRepositoryBase<Product>, ProductRepository>();
 builder.Services.AddScoped<IProductService<ProductDto>, ProductService>();
 

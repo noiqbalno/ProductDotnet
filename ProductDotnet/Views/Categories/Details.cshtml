@@ -1,4 +1,4 @@
-﻿@model ProductDotnet.Models.Category
+﻿@model ProductDotnet.Models.Dto.CategoryDto
 
 @{
     ViewData["Title"] = "Details";
@@ -10,23 +10,25 @@
     <h4>Category</h4>
     <hr />
     <dl class="row">
-        <dt class = "col-sm-2">
+        <dt class="col-sm-2">
             @Html.DisplayNameFor(model => model.CategoryName)
         </dt>
-        <dd class = "col-sm-10">
+        <dd class="col-sm-10">
             @Html.DisplayFor(model => model.CategoryName)
         </dd>
-        <dt class = "col-sm-2">
+        <dt class="col-sm-2">
             @Html.DisplayNameFor(model => model.Description)
         </dt>
-        <dd class = "col-sm-10">
+        <dd class="col-sm-10">
             @Html.DisplayFor(model => model.Description)
         </dd>
-        <dt class = "col-sm-2">
+        <dt class="col-sm-2">
             @Html.DisplayNameFor(model => model.Photo)
         </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Photo)
+        <dd class="col-sm-10">
+            <li data-bs-toggle="tooltip" data-popup="tooltip-custom" data-bs-placement="top" class="avatar avatar-xs pull-up" title="Photo">
+                <img src="~/Resources/Images/@Html.DisplayFor(model => model.Photo)" alt="photo" style="width:68px;height:68px;" />
+            </li>
         </dd>
     </dl>
 </div>

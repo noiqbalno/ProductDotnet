@@ -16,17 +16,18 @@ namespace ProductDotnet.Controllers
 {
     public class ProductsController : Controller
     {
-        private readonly RepositoryDbContext _context;
 
         private readonly IProductService<ProductDto> _productService;
+        private readonly ICategoryService<CategoryDto> _categoryService;
 
         private readonly IRepositoryBase<Product> _repositoryBase;
+        private readonly IRepositoryBase<Category> _repoCat;
 
 
-        public ProductsController(IProductService<ProductDto> productService, RepositoryDbContext context)
+        public ProductsController(IProductService<ProductDto> productService, ICategoryService<CategoryDto> categoryService)
         {
             _productService = productService;
-            _context = context;
+            _categoryService = categoryService;
         }
 
         // GET: Products
@@ -55,9 +56,9 @@ namespace ProductDotnet.Controllers
         }
 
         // GET: Products/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "CategoryName");
+            ViewData["CategoryId"] = new SelectList(await _categoryService.FindAll(true), "Id", "CategoryName");
             return View();
         }
 
@@ -68,9 +69,11 @@ namespace ProductDotnet.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create([Bind("Id,ProductName,Price,Stock,Photo,CategoryId")] ProductDtoCreate productCreate)
+        public async Task<IActionResult> Create([Bind("Id,ProductName,Price,Stock,Photo,CategoryId")] ProductDtoCreate productCreate)
         {
-            var cat = _context.Categories.Find(productCreate.CategoryId);
+            //var cat = _context.Categories.Find(productCreate.CategoryId);
+            //var cat = await _categoryService.FindById(productCreate.CategoryId, true);
+
             if (ModelState.IsValid)
             {
                 try
@@ -95,11 +98,11 @@ namespace ProductDotnet.Controllers
                             Price = productCreate.Price,
                             CategoryId = productCreate.CategoryId,
                             Photo = fileName,
-                            Category = cat
+                            //Category = cat
                         };
                         _productService.Create(productNew);
 
-                        ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "CategoryName", productCreate.CategoryId);
+                        ViewData["CategoryId"] = new SelectList(await _categoryService.FindAll(true), "Id", "CategoryName", productCreate.CategoryId);
                         return RedirectToAction(nameof(Index));
                     }
                 }
@@ -148,7 +151,7 @@ namespace ProductDotnet.Controllers
             {
                 return NotFound();
             }
-            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "CategoryName", productDtoCreate.CategoryId);
+            ViewData["CategoryId"] = new SelectList(await _categoryService.FindAll(true), "Id", "CategoryName", productDtoCreate.CategoryId);
             return View(productDtoCreate);
         }
 
@@ -164,7 +167,7 @@ namespace ProductDotnet.Controllers
                 return NotFound();
             }
 
-            var cat = _context.Categories.Find(productCreate.CategoryId);
+            //var cat = _context.Categories.Find(productCreate.CategoryId);
 
             if (ModelState.IsValid)
             {
@@ -192,7 +195,7 @@ namespace ProductDotnet.Controllers
                             Price = productCreate.Price,
                             CategoryId = productCreate.CategoryId,
                             Photo = fileName,
-                            Category = cat
+                            //Category = cat
                         };
                         _productService.Update(categoryDto);
 
@@ -243,7 +246,7 @@ namespace ProductDotnet.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            if (_context.Products == null)
+            if (id == null)
             {
                 return Problem("Entity set 'RepositoryDbContext.Products'  is null.");
             }
@@ -258,7 +261,7 @@ namespace ProductDotnet.Controllers
 
         private bool ProductExists(int id)
         {
-          return (_context.Products?.Any(e => e.Id == id)).GetValueOrDefault();
+            return (_productService.FindAll(true)?.Result.Any(e => e.Id == id)).GetValueOrDefault();
         }
     }
 }

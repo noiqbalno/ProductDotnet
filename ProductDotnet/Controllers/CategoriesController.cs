@@ -1,12 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using ProductDotnet.Models;
+using ProductDotnet.Models.Dto;
+using ProductDotnet.Repository;
 using ProductDotnet.RepositoryContext;
+using ProductDotnet.Service;
 
 namespace ProductDotnet.Controllers
 {
@@ -14,29 +18,35 @@ namespace ProductDotnet.Controllers
     {
         private readonly RepositoryDbContext _context;
 
-        public CategoriesController(RepositoryDbContext context)
+        private readonly ICategoryService<CategoryDto> _categoryService;
+
+        //replace RepositoryDbContext with IRepositoryBase
+        private readonly IRepositoryBase<Category> _repositoryBase;
+
+
+        public CategoriesController(ICategoryService<CategoryDto> categoryService)
         {
-            _context = context;
+            _categoryService = categoryService;
         }
+
 
         // GET: Categories
         public async Task<IActionResult> Index()
         {
-              return _context.Categories != null ? 
-                          View(await _context.Categories.ToListAsync()) :
-                          Problem("Entity set 'RepositoryDbContext.Categories'  is null.");
+            return View(await _categoryService.FindAll(true));
+
         }
 
         // GET: Categories/Details/5
         public async Task<IActionResult> Details(int? id)
         {
-            if (id == null || _context.Categories == null)
+            if (id == null)
             {
                 return NotFound();
             }
 
-            var category = await _context.Categories
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var category = _categoryService.FindAll(true).Result.FirstOrDefault(m => m.Id == id);
+
             if (category == null)
             {
                 return NotFound();
@@ -56,31 +66,71 @@ namespace ProductDotnet.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,CategoryName,Description,Photo")] Category category)
+        public async Task<IActionResult> Create([Bind("CategoryName,Description,Photo")] CategoryDtoCreate categoryDtoCreate)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(category);
-                await _context.SaveChangesAsync();
+
+                try
+                {
+                    var file = categoryDtoCreate.Photo;
+                    var folderName = Path.Combine("Resources", "Images");
+                    var pathToSave = Path.Combine(Directory.GetCurrentDirectory(), folderName);
+                    if (file.Length > 0)
+                    {
+                        var fileName = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
+                        var fullPath = Path.Combine(pathToSave, fileName);
+                        var dbPath = Path.Combine(folderName, fileName);
+                        using (var stream = new FileStream(fullPath, FileMode.Create))
+                        {
+                            file.CopyTo(stream);
+                        }
+
+                        //collect data from dto dan filename
+                        var categoryDto = new CategoryDto
+                        {
+                            CategoryName = categoryDtoCreate.CategoryName,
+                            Description = categoryDtoCreate.Description,
+                            Photo = fileName
+                        };
+                        _categoryService.Create(categoryDto);
+
+                        return RedirectToAction(nameof(Index));
+
+                    }
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
                 return RedirectToAction(nameof(Index));
             }
-            return View(category);
+            return View(categoryDtoCreate);
         }
 
         // GET: Categories/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
-            if (id == null || _context.Categories == null)
+            if (id == null)
             {
                 return NotFound();
             }
 
-            var category = await _context.Categories.FindAsync(id);
+            var category = await _categoryService.FindById((int)id, true);
+            var categoryDtoCreate = new CategoryDtoCreate
+            {
+                Id = category.Id,
+                CategoryName = category.CategoryName,
+                Description = category.Description
+            };
+
             if (category == null)
             {
                 return NotFound();
             }
-            return View(category);
+            return View(categoryDtoCreate);
+
         }
 
         // POST: Categories/Edit/5
@@ -88,9 +138,9 @@ namespace ProductDotnet.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,CategoryName,Description,Photo")] Category category)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,CategoryName,Description,Photo")] CategoryDtoCreate categoryDtoCreate)
         {
-            if (id != category.Id)
+            if (id != categoryDtoCreate.Id)
             {
                 return NotFound();
             }
@@ -99,12 +149,38 @@ namespace ProductDotnet.Controllers
             {
                 try
                 {
-                    _context.Update(category);
-                    await _context.SaveChangesAsync();
+                    var file = categoryDtoCreate.Photo;
+                    var folderName = Path.Combine("Resources", "Images");
+                    var pathToSave = Path.Combine(Directory.GetCurrentDirectory(), folderName);
+                    if (file.Length > 0)
+                    {
+                        var fileName = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
+                        var fullPath = Path.Combine(pathToSave, fileName);
+                        var dbPath = Path.Combine(folderName, fileName);
+                        using (var stream = new FileStream(fullPath, FileMode.Create))
+                        {
+                            file.CopyTo(stream);
+                        }
+
+                        //collect data from dto dan filename
+                        var categoryDto = new CategoryDto
+                        {
+                            Id = categoryDtoCreate.Id,
+                            CategoryName = categoryDtoCreate.CategoryName,
+                            Description = categoryDtoCreate.Description,
+                            Photo = fileName
+                        };
+                        _categoryService.Update(categoryDto);
+
+                        return RedirectToAction(nameof(Index));
+
+                    }
+
+
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    if (!CategoryExists(category.Id))
+                    if (!CategoryExists(categoryDtoCreate.Id))
                     {
                         return NotFound();
                     }
@@ -115,19 +191,20 @@ namespace ProductDotnet.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
-            return View(category);
+            return View(categoryDtoCreate);
         }
 
         // GET: Categories/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
-            if (id == null || _context.Categories == null)
+            if (id == null)
             {
                 return NotFound();
             }
 
-            var category = await _context.Categories
-                .FirstOrDefaultAsync(m => m.Id == id);
+            //var category = await _categoryService.FindById((int)id,true);
+
+            var category = _categoryService.FindAll(true).Result.FirstOrDefault(m => m.Id == id);
             if (category == null)
             {
                 return NotFound();
@@ -139,25 +216,26 @@ namespace ProductDotnet.Controllers
         // POST: Categories/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        public async Task<IActionResult> DeleteConfirmed(int? id)
         {
-            if (_context.Categories == null)
+            if (id == null)
             {
                 return Problem("Entity set 'RepositoryDbContext.Categories'  is null.");
             }
-            var category = await _context.Categories.FindAsync(id);
+            //var category = await _categoryService.FindById((int)id,true);
+            var category = _categoryService.FindAll(true).Result.FirstOrDefault(m => m.Id == id);
             if (category != null)
             {
-                _context.Categories.Remove(category);
+                _categoryService.Delete(category);
             }
-            
-            await _context.SaveChangesAsync();
+
+            //await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
 
         private bool CategoryExists(int id)
         {
-          return (_context.Categories?.Any(e => e.Id == id)).GetValueOrDefault();
+            return (_categoryService.FindAll(true)?.Result.Any(e => e.Id == id)).GetValueOrDefault();
         }
     }
 }
